@@ -39,7 +39,7 @@ int main()
 	// Close Database
 	Database_End();
 	
-	// Release Mutex, etc.
+	// Release Mutex, etc....
 
 	printf("Entire process end!\n");
 
