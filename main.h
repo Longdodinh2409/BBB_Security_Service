@@ -19,9 +19,10 @@
 #define MAX_NAME_LEN 			(16)
 #define LOG_BUFFER_SIZE 		(128)
 #define UART_DEVICE 			("/dev/ttyO1")
-#define DATABASE_NAME			("memberdb")
+#define DATABASE_NAME			("memberdb.db")
 #define DATABASE_TABLE_NAME		("memberlst")
 #define NONE_FINGER_PRINT_ID	(99)
+#define OFFSET_MEMBER_ID		(1)
 
 // Enum trạng thái máy ảo (FSM) của module vân tay
 typedef enum {

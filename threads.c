@@ -26,7 +26,7 @@ void* handle_TimeDisplay_thread(void *arg)
         time_t raw_time = time(NULL); // Lấy raw Unix Timestamp
 
         // Chuyển con số thành chuỗi để thiết bị đầu cuối bên kia dễ đọc
-        snprintf(s_acTXTimeDisplayBuffer, sizeof(s_acTXTimeDisplayBuffer), "#TS=%ld\n", raw_time);
+        snprintf(s_acTXTimeDisplayBuffer, sizeof(s_acTXTimeDisplayBuffer), "#TS=%ld\n;", raw_time);
 
         // Gửi chuỗi này qua UART
         int bytes_written = write(uart_fd, s_acTXTimeDisplayBuffer, strlen(s_acTXTimeDisplayBuffer));
@@ -65,13 +65,13 @@ void* handle_SearchMember_thread(void *arg)
 				printf("Parsing success. State: %d - ID: %d\n", s_u8State, s_u8FingerID);
 
 				// Step 3: Get ID and return Member Name
-				int result = get_user_name(s_u8FingerID, s_acMemberName);
+				int result = get_user_name((s_u8FingerID + OFFSET_MEMBER_ID), s_acMemberName);
 				if (result == 1)
 				{
-					printf("Found! It's %s", s_acMemberName);
-					// UART send Member Name to STM32F4
-					snprintf(s_acTXSearchMemberBuffer, LOG_BUFFER_SIZE, "#ID=%hhu,#Name=%s", s_u8FingerID, s_acMemberName);
+					printf("Found! It's %s\n", s_acMemberName);
 
+					// UART send Member Name to STM32F4
+					snprintf(s_acTXSearchMemberBuffer, LOG_BUFFER_SIZE, "#State=%hhu,#Name=%s;", s_u8State, s_acMemberName);
 					int bytes_written = write(uart_fd, s_acTXSearchMemberBuffer, strlen(s_acTXSearchMemberBuffer));
 
 					if (bytes_written < 0) 
@@ -80,7 +80,7 @@ void* handle_SearchMember_thread(void *arg)
 					} 
 					else 
 					{
-						printf("Da gui qua UART1: %s\n", s_acTXTimeDisplayBuffer);
+						printf("Da gui qua UART1: %s\n", s_acTXSearchMemberBuffer);
 					}
 				}
 				else
