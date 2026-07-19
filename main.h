@@ -39,7 +39,8 @@ typedef enum {
 	FSM_FINGER_BLOCK_INF,		// Bị block mãi mãi khi sai vân tay 15 lần, cho đến khi BBB unlock
 	FSM_FINGER_UNBLOCK,			// Đã hết giờ Block
 
-	FSM_SYSTEM_STM32F4_WAKEUP	// STM32F4 wake up (initialize done!)
+	FSM_SYSTEM_STM32F4_WAKEUP,	// STM32F4 wake up (initialize done!)
+	FSM_NEW_FINGERPRINT_ADDED
 } Fingerprint_State_t;
 
 // Biến toàn cục để dùng chung
@@ -56,5 +57,6 @@ void handle_exit(int sig);
 void* handle_TimeDisplay_thread(void *arg);
 void* handle_SearchMember_thread(void *arg);
 int get_user_name(int id, char* output_name);
+int add_new_member(int id, const char* name);
 
 #endif

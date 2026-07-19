@@ -69,6 +69,7 @@ void* handle_TimeDisplay_thread(void *arg)
 void* handle_SearchMember_thread(void *arg)
 {
 	int parsed_count = 0;
+	int result = 0;
 	// unused argument
 	(void)arg;
 
@@ -89,7 +90,7 @@ void* handle_SearchMember_thread(void *arg)
 				printf("Parsing success. State: %d - ID: %d\n", s_u8State, s_u8FingerID);
 
 				// Step 3: Get ID and return Member Name
-				int result = get_user_name((s_u8FingerID + OFFSET_MEMBER_ID), s_acMemberName);
+				result = get_user_name((s_u8FingerID + OFFSET_MEMBER_ID), s_acMemberName);
 				if (result == 1)
 				{
 					printf("Found! It's %s\n", s_acMemberName);
@@ -109,7 +110,19 @@ void* handle_SearchMember_thread(void *arg)
 				}
 				else
 				{
-					printf("Unknown member\n");
+					if (s_u8State == FSM_NEW_FINGERPRINT_ADDED)
+					{
+						result = add_new_member((s_u8FingerID), "John");
+						if (result == 1)
+						{
+							result = get_user_name((s_u8FingerID), s_acMemberName);
+							printf("Added new member, %s!\n", s_acMemberName);
+						}
+					}
+					else
+					{
+						printf("Unknown member\n");
+					}
 				}
 			}
 			else
