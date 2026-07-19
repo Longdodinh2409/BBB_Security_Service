@@ -144,7 +144,7 @@ void* handle_SearchMember_thread(void *arg)
 				}
 				else
 				{
-					printf("Parsing failed. Wait another frame!\n");
+					printf("Parsing failed. Frame: %s. Wait another frame!\n", s_acRXSearchMemberBuffer);
 					continue;
 				}
 			}
