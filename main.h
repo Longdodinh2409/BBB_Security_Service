@@ -33,7 +33,13 @@ typedef enum {
     FSM_FINGER_WAIT_IMG2TZ,     // Đợi kết quả chuyển đặc trưng
     FSM_FINGER_SEND_SEARCH,     // Yêu cầu tìm kiếm 1:N trong thư viện Flash
     FSM_FINGER_WAIT_SEARCH,     // Đợi kết quả tìm kiếm (Quan trọng nhất)
-    FSM_FINGER_DELAY            // Nghỉ 1 chút xíu
+    FSM_FINGER_DELAY,        	// Nghỉ 1 chút xíu
+	FSM_FINGER_BLOCK_5M,		// Bị block 5 phút khi sai vân tay 5 lần
+	FSM_FINGER_BLOCK_10M,		// Bị block 10 phút khi sai vân tay 10 lần
+	FSM_FINGER_BLOCK_INF,		// Bị block mãi mãi khi sai vân tay 15 lần, cho đến khi BBB unlock
+	FSM_FINGER_UNBLOCK,			// Đã hết giờ Block
+
+	FSM_SYSTEM_STM32F4_WAKEUP	// STM32F4 wake up (initialize done!)
 } Fingerprint_State_t;
 
 // Biến toàn cục để dùng chung
