@@ -54,9 +54,13 @@ void UART_End(void);
 int Database_Init(const char* db_name);
 void Database_End(void);
 void handle_exit(int sig);
+
 void* handle_TimeDisplay_thread(void *arg);
 void* handle_SearchMember_thread(void *arg);
+void* handle_CLI_thread(void *arg);
+
 int get_user_name(int id, char* output_name);
 int add_new_member(int id, const char* name);
+int delete_member(int id) ;
 
 #endif

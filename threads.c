@@ -9,8 +9,11 @@ static char s_acTXTimeDisplayBuffer[64];
 
 static bool bIsSendTimeDisplayBy1Sec = false;
 
+static int s_pending_add_id = -1;
+
 pthread_mutex_t g_time_mutex = PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t g_time_cond = PTHREAD_COND_INITIALIZER;
+pthread_mutex_t g_db_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 void handle_exit(int sig)
 {
@@ -112,12 +115,20 @@ void* handle_SearchMember_thread(void *arg)
 				{
 					if (s_u8State == FSM_NEW_FINGERPRINT_ADDED)
 					{
-						result = add_new_member((s_u8FingerID), "John");
-						if (result == 1)
-						{
-							result = get_user_name((s_u8FingerID), s_acMemberName);
-							printf("Added new member, %s!\n", s_acMemberName);
-						}
+						// result = add_new_member((s_u8FingerID), "John");
+						// if (result == 1)
+						// {
+						// 	result = get_user_name((s_u8FingerID), s_acMemberName);
+						// 	printf("Added new member, %s!\n", s_acMemberName);
+						// }
+
+						// 1. Lưu lại ID vừa được tạo thành công từ module
+						s_pending_add_id = s_u8FingerID;
+						
+						// 2. In ra thông báo nhắc nhở người dùng nhập lệnh (kèm ký tự báo CLI)
+						printf("\n[SYSTEM] Phat hien van tay moi (ID: %d).\n", s_pending_add_id);
+						printf("Hay go lenh: add %d <Ten_thanh_vien> de luu Member thu %d vao Database!\nBBB_Admin> ", (s_pending_add_id + 1), s_pending_add_id + 1);
+						fflush(stdout);
 					}
 					else
 					{
@@ -173,4 +184,81 @@ void* handle_SearchMember_thread(void *arg)
 	}
 
 	return NULL;
+}
+
+void* handle_CLI_thread(void *arg)
+{
+    (void)arg;
+    char input_buffer[256];
+    char cmd[32];
+    int input_id;
+    char input_name[MAX_NAME_LEN];
+
+    // Tạo độ trễ nhỏ lúc khởi động để tránh terminal in đè lên các log khởi tạo của hệ thống
+    sleep(1); 
+
+    while (g_bIsContinueLoop)
+    {
+        printf("BBB_Admin> ");
+        fflush(stdout); // Ép terminal in ra dấu nhắc lệnh ngay lập tức
+
+        // fgets sẽ block luồng này lại cho đến khi bạn nhấn Enter (Không ăn CPU)
+        if (fgets(input_buffer, sizeof(input_buffer), stdin) != NULL)
+        {
+            // Xóa bỏ ký tự '\n' ở cuối chuỗi do Enter tạo ra
+            input_buffer[strcspn(input_buffer, "\n")] = '\0';
+
+            // Nếu chỉ nhấn Enter mà không nhập gì thì bỏ qua
+            if (strlen(input_buffer) == 0) continue;
+
+            // --- KIỂM TRA LỆNH XÓA ---
+            // Format mong muốn: delete <ID>
+            if (sscanf(input_buffer, "delete %d", &input_id) == 1)
+            {
+                delete_member(input_id);
+            }
+            // --- KIỂM TRA LỆNH THÊM ---
+            // Format mong muốn: add <ID> <Tên có chứa dấu cách>
+            // %[^\n] nghĩa là đọc toàn bộ các ký tự cho đến khi gặp \n (cho phép khoảng trắng)
+            else if (sscanf(input_buffer, "add %d %[^\n]", &input_id, input_name) == 2)
+            {
+                // if (s_u8State == FSM_NEW_FINGERPRINT_ADDED && s_pending_add_id == input_id)
+				if ((s_pending_add_id + 1) == input_id)
+				{
+					int res = add_new_member(input_id, input_name);
+					if (res == 1) 
+					{
+						// Xóa cờ trạng thái sau khi thêm thành công để tránh add lặp lại
+						s_pending_add_id = -1;
+						// s_u8State = FSM_NONE; 
+					}
+				}
+				// else if (s_u8State != FSM_NEW_FINGERPRINT_ADDED)
+				// {
+				// 	printf("Loi: Module chua san sang! Vui long quet van tay de tao ID moi tren module truoc.\n");
+				// }
+				else 
+				{
+					printf("Loi: ID khong khop! ID dang cho de them la %d.\n", s_pending_add_id);
+				}
+            }
+            // // --- KIỂM TRA LỆNH THOÁT ---
+            // else if (strcmp(input_buffer, "exit") == 0 || strcmp(input_buffer, "quit") == 0)
+            // {
+            //     printf("Dang tat he thong...\n");
+            //     g_bIsContinueLoop = false;
+            //     break; // Thoát vòng lặp, kết thúc chương trình an toàn
+            // }
+            // // --- CÚ PHÁP SAI ---
+            // else
+            // {
+            //     printf("Lenh khong hop le!\n");
+            //     printf(" - Them:   add <ID> <Ten>\n");
+            //     printf(" - Xoa:    delete <ID>\n");
+            //     printf(" - Thoat:  exit\n");
+            // }
+        }
+    }
+
+    return NULL;
 }
