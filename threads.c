@@ -104,7 +104,7 @@ void* handle_SearchMember_thread(void *arg)
 
 					if (bytes_written < 0) 
 					{
-						printf("Loi truyen du lieu qua UART!\n");
+						printf("Error comm UART!\n");
 					} 
 					else 
 					{
@@ -133,6 +133,17 @@ void* handle_SearchMember_thread(void *arg)
 					else
 					{
 						printf("Unknown member\n");
+						snprintf(s_acTXSearchMemberBuffer, LOG_BUFFER_SIZE, "#State=%hhu,#Name=Unknown;", s_u8State);
+						int bytes_written = write(uart_fd, s_acTXSearchMemberBuffer, strlen(s_acTXSearchMemberBuffer));
+
+						if (bytes_written < 0) 
+						{
+							printf("Error comm UART!\n");
+						} 
+						else 
+						{
+							printf("Da gui qua UART1: %s\n", s_acTXSearchMemberBuffer);
+						}
 					}
 				}
 			}
