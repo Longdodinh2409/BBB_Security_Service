@@ -125,10 +125,10 @@ int add_new_member(int id, const char* name) {
 
 int delete_member(int id) 
 {
+	sqlite3_stmt *stmt;
+
     pthread_mutex_lock(&g_db_mutex);
-    
-    sqlite3_stmt *stmt;
-    const char *sql_delete = "DELETE FROM Users WHERE ID = ?;";
+    const char *sql_delete = "DELETE FROM memberlst WHERE ID = ?;";
     
     if (sqlite3_prepare_v2(db, sql_delete, -1, &stmt, NULL) == SQLITE_OK) {
         sqlite3_bind_int(stmt, 1, id);
@@ -136,6 +136,12 @@ int delete_member(int id)
         sqlite3_finalize(stmt);
         printf("Da xoa thanh vien co ID = %d khoi database.\n", id);
     }
+	else
+	{
+		printf("CANNOT DELETE thanh vien co ID = %d khoi database.\n", id);
+		pthread_mutex_unlock(&g_db_mutex);
+    	return 0;
+	}
     
     pthread_mutex_unlock(&g_db_mutex);
     return 1;

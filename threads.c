@@ -190,7 +190,6 @@ void* handle_CLI_thread(void *arg)
 {
     (void)arg;
     char input_buffer[256];
-    char cmd[32];
     int input_id;
     char input_name[MAX_NAME_LEN];
 
@@ -215,7 +214,11 @@ void* handle_CLI_thread(void *arg)
             // Format mong muốn: delete <ID>
             if (sscanf(input_buffer, "delete %d", &input_id) == 1)
             {
-                delete_member(input_id);
+                int req = delete_member(input_id);
+				if (req == 1)
+					printf("delete_member success!\n");
+				else
+					printf("delete_member failed!\n");
             }
             // --- KIỂM TRA LỆNH THÊM ---
             // Format mong muốn: add <ID> <Tên có chứa dấu cách>
@@ -250,13 +253,13 @@ void* handle_CLI_thread(void *arg)
             //     break; // Thoát vòng lặp, kết thúc chương trình an toàn
             // }
             // // --- CÚ PHÁP SAI ---
-            // else
-            // {
-            //     printf("Lenh khong hop le!\n");
-            //     printf(" - Them:   add <ID> <Ten>\n");
-            //     printf(" - Xoa:    delete <ID>\n");
-            //     printf(" - Thoat:  exit\n");
-            // }
+            else
+            {
+                printf("Lenh khong hop le! %s \n", input_buffer);
+                printf(" - Them:   add <ID> <Ten>\n");
+                printf(" - Xoa:    delete <ID>\n");
+                printf(" - Thoat:  exit\n");
+            }
         }
     }
 
