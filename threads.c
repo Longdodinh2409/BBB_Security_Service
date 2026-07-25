@@ -166,12 +166,20 @@ void* handle_SearchMember_thread(void *arg)
 					if ((s_u8State == FSM_FINGER_BLOCK_5M) || (s_u8State == FSM_FINGER_BLOCK_10M))
 					{
 						bIsSendTimeDisplayBy1Sec = true;
+
+						// Save history
+						ProcessWriteHistoryLog(s_u8State, "Locked");
+
 						// Đánh thức TimeDisplay_thread NGAY LẬP TỨC để bắt đầu gửi mỗi 1 giây
 						pthread_cond_signal(&g_time_cond); 
 					}
 					else if (s_u8State == FSM_FINGER_UNBLOCK)
 					{
 						bIsSendTimeDisplayBy1Sec = false;
+
+						// Save history
+						ProcessWriteHistoryLog(s_u8State, "Unlocked");
+
 						// cũng có thể gọi signal ở đây nếu muốn thread lập tức dừng gửi 1s 
 						// và chuyển ngay sang chế độ chờ 60s mà không phải đợi nốt chu kỳ 1s hiện tại.
 						pthread_cond_signal(&g_time_cond);
@@ -334,6 +342,18 @@ void ProcessWriteHistoryLog(uint8_t u8State, const char* pcname)
 	else if (u8State == (uint8_t)FSM_REMOVE_SPECIFIC_FINGERPRINT)
 	{
 		sprintf(acLog, "[%s] Removed: %s\n", time_str, pcname);
+	}
+	else if (u8State == (uint8_t)FSM_FINGER_BLOCK_5M)		
+	{
+		sprintf(acLog, "[%s] System locked %d minutes\n", time_str, 5);
+	}
+	else if (u8State == (uint8_t)FSM_FINGER_BLOCK_10M)
+	{
+		sprintf(acLog, "[%s] System locked %d minutes\n", time_str, 10);
+	}
+	else if (u8State == (uint8_t)FSM_FINGER_UNBLOCK)
+	{
+		sprintf(acLog, "[%s] System unlock!\n", time_str);
 	}
 	else
 	{
