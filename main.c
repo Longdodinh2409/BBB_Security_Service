@@ -4,6 +4,7 @@
 pthread_mutex_t uart_mutex = PTHREAD_MUTEX_INITIALIZER;
 bool g_bIsContinueLoop = true;
 pthread_t timeDisplay_thread, SearchMember_thread, cli_thread;
+pthread_mutex_t log_lock;
 
 int main()
 {
@@ -13,6 +14,9 @@ int main()
 	UART_Init();
 	Database_Init(DATABASE_NAME);
 	signal(SIGINT, handle_exit);
+
+	// Init mutex
+	pthread_mutex_init(&log_lock, NULL);
 
 	// Init thread
 	return_check = pthread_create(&timeDisplay_thread, NULL, handle_TimeDisplay_thread, NULL);
@@ -48,6 +52,7 @@ int main()
 	Database_End();
 	
 	// Release Mutex, etc....
+	pthread_mutex_destroy(&log_lock);
 
 	printf("Entire process end!\n");
 

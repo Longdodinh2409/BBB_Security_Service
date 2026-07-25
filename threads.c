@@ -102,6 +102,9 @@ void* handle_SearchMember_thread(void *arg)
 					snprintf(s_acTXSearchMemberBuffer, LOG_BUFFER_SIZE, "#State=%hhu,#Name=%s;", s_u8State, s_acMemberName);
 					int bytes_written = write(uart_fd, s_acTXSearchMemberBuffer, strlen(s_acTXSearchMemberBuffer));
 
+					// Save history
+					ProcessWriteHistoryLog(s_u8State, s_acMemberName);
+
 					if (bytes_written < 0) 
 					{
 						printf("Error comm UART!\n");
@@ -135,6 +138,9 @@ void* handle_SearchMember_thread(void *arg)
 						printf("Unknown member\n");
 						snprintf(s_acTXSearchMemberBuffer, LOG_BUFFER_SIZE, "#State=%hhu,#Name=Unknown;", s_u8State);
 						int bytes_written = write(uart_fd, s_acTXSearchMemberBuffer, strlen(s_acTXSearchMemberBuffer));
+
+						// Save history
+						ProcessWriteHistoryLog(s_u8State, "Unknown");
 
 						if (bytes_written < 0) 
 						{
@@ -203,6 +209,7 @@ void* handle_CLI_thread(void *arg)
     char input_buffer[256];
     int input_id;
     char input_name[MAX_NAME_LEN];
+	int req;
 
     // Tạo độ trễ nhỏ lúc khởi động để tránh terminal in đè lên các log khởi tạo của hệ thống
     sleep(1); 
@@ -225,11 +232,21 @@ void* handle_CLI_thread(void *arg)
             // Format mong muốn: delete <ID>
             if (sscanf(input_buffer, "delete %d", &input_id) == 1)
             {
-                int req = delete_member(input_id);
+				req = get_user_name(input_id, s_acMemberName);
+				if (req == 1)
+					printf("get_user_name success!\n");
+				else
+					printf("get_user_name failed!\n");
+                
+				req = delete_member(input_id);
 				if (req == 1)
 					printf("delete_member success!\n");
 				else
 					printf("delete_member failed!\n");
+
+				// Save history
+				ProcessWriteHistoryLog((uint8_t)FSM_REMOVE_SPECIFIC_FINGERPRINT, s_acMemberName);
+
             }
             // --- KIỂM TRA LỆNH THÊM ---
             // Format mong muốn: add <ID> <Tên có chứa dấu cách>
@@ -244,7 +261,9 @@ void* handle_CLI_thread(void *arg)
 					{
 						// Xóa cờ trạng thái sau khi thêm thành công để tránh add lặp lại
 						s_pending_add_id = -1;
-						// s_u8State = FSM_NONE; 
+						
+						// Save history
+						ProcessWriteHistoryLog((uint8_t)FSM_NEW_FINGERPRINT_ADDED, input_name);
 					}
 				}
 				// else if (s_u8State != FSM_NEW_FINGERPRINT_ADDED)
@@ -275,4 +294,55 @@ void* handle_CLI_thread(void *arg)
     }
 
     return NULL;
+}
+
+void ProcessWriteHistoryLog(uint8_t u8State, const char* pcname)
+{
+	char acLog[64];
+
+	if (pcname == NULL)
+	{
+		printf("Error with pcname parameter. State: %d\n", u8State);
+		pthread_mutex_unlock(&log_lock);
+		return;
+	}
+
+	pthread_mutex_lock(&log_lock);
+
+	FILE* log_fp = fopen("Security_history_log.txt", "a");
+	if (log_fp == NULL)
+	{
+		printf("Fail at open & create Security_history_log.txt file\n");
+		pthread_mutex_unlock(&log_lock);
+		return;
+	}
+
+	// Get TimeStamp
+	time_t raw_time = time(NULL);
+    struct tm *time_info = localtime(&raw_time);
+    char time_str[32];
+    strftime(time_str, sizeof(time_str), "%Y-%m-%d %H:%M:%S", time_info);
+
+	if (u8State == (uint8_t)FSM_FINGER_WAIT_SEARCH)
+	{
+		sprintf(acLog, "[%s] Accessed: %s\n", time_str, pcname);
+	}
+	else if (u8State == (uint8_t)FSM_NEW_FINGERPRINT_ADDED)
+	{
+		sprintf(acLog, "[%s] Added: %s\n", time_str, pcname);
+	}
+	else if (u8State == (uint8_t)FSM_REMOVE_SPECIFIC_FINGERPRINT)
+	{
+		sprintf(acLog, "[%s] Removed: %s\n", time_str, pcname);
+	}
+	else
+	{
+		sprintf(acLog, "[%s] Invalid event. State: %d\n", time_str, u8State);
+	}
+
+	fprintf(log_fp, "%s", acLog);
+
+	fclose(log_fp);
+	
+	pthread_mutex_unlock(&log_lock);
 }

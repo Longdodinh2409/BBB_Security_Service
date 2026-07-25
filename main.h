@@ -18,7 +18,7 @@
 // Định nghĩa kích thước bộ đệm để tránh tràn RAM
 #define MAX_NAME_LEN 			(16)
 #define LOG_BUFFER_SIZE 		(128)
-#define UART_DEVICE 			("/dev/ttyO1")
+#define UART_DEVICE 			("/dev/ttyS1")
 #define DATABASE_NAME			("memberdb.db")
 #define DATABASE_TABLE_NAME		("memberlst")
 #define NONE_FINGER_PRINT_ID	(99)
@@ -40,7 +40,8 @@ typedef enum {
 	FSM_FINGER_UNBLOCK,			// Đã hết giờ Block
 
 	FSM_SYSTEM_STM32F4_WAKEUP,	// STM32F4 wake up (initialize done!)
-	FSM_NEW_FINGERPRINT_ADDED
+	FSM_NEW_FINGERPRINT_ADDED,
+	FSM_REMOVE_SPECIFIC_FINGERPRINT
 } Fingerprint_State_t;
 
 // Biến toàn cục để dùng chung
@@ -48,6 +49,7 @@ extern int uart_fd;
 extern pthread_mutex_t uart_mutex;
 extern bool g_bIsContinueLoop;
 extern pthread_t timeDisplay_thread, SearchMember_thread;
+extern pthread_mutex_t log_lock;
 
 void UART_Init(void);
 void UART_End(void);
@@ -58,6 +60,7 @@ void handle_exit(int sig);
 void* handle_TimeDisplay_thread(void *arg);
 void* handle_SearchMember_thread(void *arg);
 void* handle_CLI_thread(void *arg);
+void ProcessWriteHistoryLog(uint8_t u8State, const char* pcname);
 
 int get_user_name(int id, char* output_name);
 int add_new_member(int id, const char* name);
