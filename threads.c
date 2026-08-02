@@ -97,7 +97,7 @@ void* handle_SearchMember_thread(void *arg)
 					if (s_pending_add_id == s_u8FingerID)
 					{
 						printf("\n[SYSTEM] Van tay moi da duoc tao thanh cong (UART ID: %d).\n", s_pending_add_id);
-						printf("Hay go lenh: add %d <Ten_thanh_vien> de luu Member thu %d vao Database!\nBBB_Admin> ", (s_pending_add_id + 1), (s_pending_add_id + 1));
+						printf("BBB_Admin's Request > Hay go lenh: add %d <Ten_thanh_vien> de luu Member thu %d vao Database!\nBBB_Admin> ", (s_pending_add_id + 1), (s_pending_add_id + 1));
 						fflush(stdout);
 					}
 					else
@@ -196,7 +196,16 @@ void* handle_SearchMember_thread(void *arg)
 							bIsSendTimeDisplayBy1Sec = true;
 
 							// Save history
-							ProcessWriteHistoryLog(s_u8State, "Locked");
+							ProcessWriteHistoryLog(s_u8State, "Locked temporarily");
+
+							// Đánh thức TimeDisplay_thread NGAY LẬP TỨC để bắt đầu gửi mỗi 1 giây
+							pthread_cond_signal(&g_time_cond); 
+						}
+						if (s_u8State == FSM_FINGER_BLOCK_INF)
+						{
+							// Save history
+							ProcessWriteHistoryLog(s_u8State, "Locked infinity!");
+							printf("BBB_Admin's Request > Hay go lenh: 'unblock' de thoat khoi tinh trang Lock Infinity!\n");
 
 							// Đánh thức TimeDisplay_thread NGAY LẬP TỨC để bắt đầu gửi mỗi 1 giây
 							pthread_cond_signal(&g_time_cond); 
@@ -253,8 +262,8 @@ void* handle_CLI_thread(void *arg)
 
     while (g_bIsContinueLoop)
     {
-        printf("BBB_Admin> ");
-        fflush(stdout); // Ép terminal in ra dấu nhắc lệnh ngay lập tức
+        // printf("BBB_Admin> ");
+        // fflush(stdout); // Ép terminal in ra dấu nhắc lệnh ngay lập tức
 
         // fgets sẽ block luồng này lại cho đến khi bạn nhấn Enter (Không ăn CPU)
         if (fgets(input_buffer, sizeof(input_buffer), stdin) != NULL)
@@ -312,6 +321,26 @@ void* handle_CLI_thread(void *arg)
 					printf("Loi: ID khong khop! ID dang cho de them la %d.\n", s_pending_add_id);
 				}
             }
+			else if (strcmp(input_buffer, "unblock") == 0)
+			{
+				snprintf(s_acTXSearchMemberBuffer, LOG_BUFFER_SIZE, "#State=%hhu;", FSM_FINGER_UNBLOCK);
+				int bytes_written = write(uart_fd, s_acTXSearchMemberBuffer, strlen(s_acTXSearchMemberBuffer));
+
+				if (bytes_written < 0) {
+					printf("Loi truyen du lieu qua UART!\n");
+				} else {
+					printf("Da gui qua UART1: %s\n", s_acTXTimeDisplayBuffer);
+				}
+
+				bIsSendTimeDisplayBy1Sec = false;
+
+				// Save history
+				ProcessWriteHistoryLog(FSM_FINGER_UNBLOCK, "Unlocked");
+
+				// cũng có thể gọi signal ở đây nếu muốn thread lập tức dừng gửi 1s 
+				// và chuyển ngay sang chế độ chờ 60s mà không phải đợi nốt chu kỳ 1s hiện tại.
+				pthread_cond_signal(&g_time_cond);
+			}
             // // --- KIỂM TRA LỆNH THOÁT ---
             // else if (strcmp(input_buffer, "exit") == 0 || strcmp(input_buffer, "quit") == 0)
             // {
@@ -322,9 +351,10 @@ void* handle_CLI_thread(void *arg)
             // // --- CÚ PHÁP SAI ---
             else
             {
-                printf("Lenh khong hop le! %s \n", input_buffer);
+                printf("BBB_Admin's >Lenh khong hop le! %s \n", input_buffer);
                 printf(" - Them:   add <ID> <Ten>\n");
                 printf(" - Xoa:    delete <ID>\n");
+				printf(" - Ket thuc Block Inifinity:    unblock\n");
                 printf(" - Thoat:  exit\n");
             }
         }
@@ -379,6 +409,10 @@ void ProcessWriteHistoryLog(uint8_t u8State, const char* pcname)
 	else if (u8State == (uint8_t)FSM_FINGER_BLOCK_10M)
 	{
 		sprintf(acLog, "[%s] System locked %d minutes\n", time_str, 10);
+	}
+	else if (u8State == (uint8_t)FSM_FINGER_BLOCK_INF)
+	{
+		sprintf(acLog, "[%s] System locked infinity!\n", time_str);
 	}
 	else if (u8State == (uint8_t)FSM_FINGER_UNBLOCK)
 	{
