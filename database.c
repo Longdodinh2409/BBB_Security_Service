@@ -5,6 +5,8 @@
 
 sqlite3 *db;
 
+extern pthread_mutex_t g_db_mutex;
+
 int Database_Init(const char* db_name)
 {
     int rc = sqlite3_open(db_name, &db);
@@ -36,6 +38,47 @@ void Database_End(void)
 {
 	sqlite3_close(db);
 	printf("Closed SQLite3 database");
+}
+
+int get_lowest_available_id(void)
+{
+    sqlite3_stmt *stmt;
+    const char *sql_query =
+        "SELECT MIN(t1.ID + 1) AS NextID "
+        "FROM memberlst t1 "
+        "LEFT JOIN memberlst t2 ON t1.ID + 1 = t2.ID "
+        "WHERE t2.ID IS NULL;";
+    int rc;
+    int next_id = 1;
+
+    pthread_mutex_lock(&g_db_mutex);
+
+    rc = sqlite3_prepare_v2(db, sql_query, -1, &stmt, NULL);
+    if (rc != SQLITE_OK)
+    {
+        fprintf(stderr, "Lỗi chuẩn bị truy vấn tìm ID trống: %s\n", sqlite3_errmsg(db));
+        pthread_mutex_unlock(&g_db_mutex);
+        return 0;
+    }
+
+    rc = sqlite3_step(stmt);
+    if (rc == SQLITE_ROW)
+    {
+        next_id = sqlite3_column_int(stmt, 0);
+        if (next_id < 1)
+        {
+            next_id = 1;
+        }
+    }
+    else
+    {
+        next_id = 1;
+    }
+
+    sqlite3_finalize(stmt);
+    pthread_mutex_unlock(&g_db_mutex);
+
+    return next_id;
 }
 
 int get_user_name(int id, char* output_name) 
@@ -78,4 +121,69 @@ int get_user_name(int id, char* output_name)
     sqlite3_finalize(stmt);
     
     return found; // Trả về 1 nếu có tên, 0 nếu Unknown
+}
+
+int add_new_member(int id, const char* name) {
+    sqlite3_stmt *stmt;
+
+	pthread_mutex_lock(&g_db_mutex);
+    // Dùng 2 dấu ? cho ID và Name
+    const char *sql_insert = "INSERT INTO memberlst (ID, Name) VALUES (?, ?);";
+    int rc;
+
+    // B1: Biên dịch câu lệnh SQL
+    rc = sqlite3_prepare_v2(db, sql_insert, -1, &stmt, NULL);
+    if (rc != SQLITE_OK) {
+        fprintf(stderr, "Lỗi chuẩn bị truy vấn Insert: %s\n", sqlite3_errmsg(db));
+		pthread_mutex_unlock(&g_db_mutex);
+        return 0;
+    }
+
+    // B2: Gắn (Bind) giá trị vào các dấu ?
+    sqlite3_bind_int(stmt, 1, id); // Dấu ? thứ nhất (ID)
+    
+    // Dấu ? thứ hai (Name). Tham số SQLITE_STATIC báo cho SQLite biết 
+    // chuỗi name sẽ không bị thay đổi bộ nhớ trong quá trình thực thi.
+    sqlite3_bind_text(stmt, 2, name, -1, SQLITE_STATIC); 
+
+    // B3: Thực thi truy vấn
+    rc = sqlite3_step(stmt);
+    if (rc != SQLITE_DONE) {
+        fprintf(stderr, "Lỗi khi thêm user (Có thể trùng ID): %s\n", sqlite3_errmsg(db));
+        sqlite3_finalize(stmt);
+		pthread_mutex_unlock(&g_db_mutex);
+        return 0;
+    }
+
+    // B4: Dọn dẹp
+    sqlite3_finalize(stmt);
+    printf("Đã thêm thành công: ID = %d, Name = %s\n", id, name);
+
+	pthread_mutex_unlock(&g_db_mutex);
+
+    return 1;
+}
+
+int delete_member(int id) 
+{
+	sqlite3_stmt *stmt;
+
+    pthread_mutex_lock(&g_db_mutex);
+    const char *sql_delete = "DELETE FROM memberlst WHERE ID = ?;";
+    
+    if (sqlite3_prepare_v2(db, sql_delete, -1, &stmt, NULL) == SQLITE_OK) {
+        sqlite3_bind_int(stmt, 1, id);
+        sqlite3_step(stmt);
+        sqlite3_finalize(stmt);
+        printf("Da xoa thanh vien co ID = %d khoi database.\n", id);
+    }
+	else
+	{
+		printf("CANNOT DELETE thanh vien co ID = %d khoi database.\n", id);
+		pthread_mutex_unlock(&g_db_mutex);
+    	return 0;
+	}
+    
+    pthread_mutex_unlock(&g_db_mutex);
+    return 1;
 }
