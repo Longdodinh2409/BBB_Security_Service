@@ -92,6 +92,21 @@ void* handle_SearchMember_thread(void *arg)
 			{
 				printf("Parsing success. State: %d - ID: %d\n", s_u8State, s_u8FingerID);
 
+				if (s_u8State == FSM_NEW_FINGERPRINT_ADDED)
+				{
+					if (s_pending_add_id == s_u8FingerID)
+					{
+						printf("\n[SYSTEM] Van tay moi da duoc tao thanh cong (UART ID: %d).\n", s_pending_add_id);
+						printf("Hay go lenh: add %d <Ten_thanh_vien> de luu Member thu %d vao Database!\nBBB_Admin> ", (s_pending_add_id + 1), (s_pending_add_id + 1));
+						fflush(stdout);
+					}
+					else
+					{
+						printf("[SYSTEM] Nhận trạng thái add thành công nhưng ID không khớp pending ID (%d).\n", s_pending_add_id);
+					}
+					continue;
+				}
+
 				// Step 3: Get ID and return Member Name
 				result = get_user_name((s_u8FingerID + OFFSET_MEMBER_ID), s_acMemberName);
 				if (result == 1)
@@ -116,40 +131,20 @@ void* handle_SearchMember_thread(void *arg)
 				}
 				else
 				{
-					if (s_u8State == FSM_NEW_FINGERPRINT_ADDED)
+					printf("Unknown member\n");
+					snprintf(s_acTXSearchMemberBuffer, LOG_BUFFER_SIZE, "#State=%hhu,#Name=Unknown;", s_u8State);
+					int bytes_written = write(uart_fd, s_acTXSearchMemberBuffer, strlen(s_acTXSearchMemberBuffer));
+
+					// Save history
+					ProcessWriteHistoryLog(s_u8State, "Unknown");
+
+					if (bytes_written < 0) 
 					{
-						// result = add_new_member((s_u8FingerID), "John");
-						// if (result == 1)
-						// {
-						// 	result = get_user_name((s_u8FingerID), s_acMemberName);
-						// 	printf("Added new member, %s!\n", s_acMemberName);
-						// }
-
-						// 1. Lưu lại ID vừa được tạo thành công từ module
-						s_pending_add_id = s_u8FingerID;
-						
-						// 2. In ra thông báo nhắc nhở người dùng nhập lệnh (kèm ký tự báo CLI)
-						printf("\n[SYSTEM] Phat hien van tay moi (ID: %d).\n", s_pending_add_id);
-						printf("Hay go lenh: add %d <Ten_thanh_vien> de luu Member thu %d vao Database!\nBBB_Admin> ", (s_pending_add_id + 1), s_pending_add_id + 1);
-						fflush(stdout);
-					}
-					else
+						printf("Error comm UART!\n");
+					} 
+					else 
 					{
-						printf("Unknown member\n");
-						snprintf(s_acTXSearchMemberBuffer, LOG_BUFFER_SIZE, "#State=%hhu,#Name=Unknown;", s_u8State);
-						int bytes_written = write(uart_fd, s_acTXSearchMemberBuffer, strlen(s_acTXSearchMemberBuffer));
-
-						// Save history
-						ProcessWriteHistoryLog(s_u8State, "Unknown");
-
-						if (bytes_written < 0) 
-						{
-							printf("Error comm UART!\n");
-						} 
-						else 
-						{
-							printf("Da gui qua UART1: %s\n", s_acTXSearchMemberBuffer);
-						}
+						printf("Da gui qua UART1: %s\n", s_acTXSearchMemberBuffer);
 					}
 				}
 			}
@@ -161,35 +156,69 @@ void* handle_SearchMember_thread(void *arg)
 				{
 					printf("Parsing success. State: %d\n", s_u8State);
 
-					pthread_mutex_lock(&g_time_mutex);
+					if (s_u8State == FSM_ENROLL_REQUEST_ID)
+					{
+						int db_id = get_lowest_available_id();
+						int uart_id = 0;
+
+						if (db_id > 0)
+						{
+							uart_id = db_id - OFFSET_MEMBER_ID;
+							s_pending_add_id = uart_id;
+							snprintf(s_acTXSearchMemberBuffer, LOG_BUFFER_SIZE, "#State=%hhu,#ID=%hhu;", s_u8State, (uint8_t)uart_id);
+							int bytes_written = write(uart_fd, s_acTXSearchMemberBuffer, strlen(s_acTXSearchMemberBuffer));
+
+							if (bytes_written < 0)
+							{
+								printf("Error comm UART!\n");
+							}
+							else
+							{
+								printf("Da gui qua UART1: %s\n", s_acTXSearchMemberBuffer);
+							}
+						}
+						else
+						{
+							printf("[SYSTEM] Khong the lay ID trong DB cho enroll.\n");
+						}
+					}
+					else if (s_u8State == FSM_ENROLL_ID_ERROR)
+					{
+						s_pending_add_id = -1;
+						printf("[SYSTEM] Rollback pending add ID do receive enroll error.\n");
+					}
+					else
+					{
+						pthread_mutex_lock(&g_time_mutex);
     
-					if ((s_u8State == FSM_FINGER_BLOCK_5M) || (s_u8State == FSM_FINGER_BLOCK_10M))
-					{
-						bIsSendTimeDisplayBy1Sec = true;
+						if ((s_u8State == FSM_FINGER_BLOCK_5M) || (s_u8State == FSM_FINGER_BLOCK_10M))
+						{
+							bIsSendTimeDisplayBy1Sec = true;
 
-						// Save history
-						ProcessWriteHistoryLog(s_u8State, "Locked");
+							// Save history
+							ProcessWriteHistoryLog(s_u8State, "Locked");
 
-						// Đánh thức TimeDisplay_thread NGAY LẬP TỨC để bắt đầu gửi mỗi 1 giây
-						pthread_cond_signal(&g_time_cond); 
+							// Đánh thức TimeDisplay_thread NGAY LẬP TỨC để bắt đầu gửi mỗi 1 giây
+							pthread_cond_signal(&g_time_cond); 
+						}
+						else if (s_u8State == FSM_FINGER_UNBLOCK)
+						{
+							bIsSendTimeDisplayBy1Sec = false;
+
+							// Save history
+							ProcessWriteHistoryLog(s_u8State, "Unlocked");
+
+							// cũng có thể gọi signal ở đây nếu muốn thread lập tức dừng gửi 1s 
+							// và chuyển ngay sang chế độ chờ 60s mà không phải đợi nốt chu kỳ 1s hiện tại.
+							pthread_cond_signal(&g_time_cond);
+						}
+						else if (s_u8State == FSM_SYSTEM_STM32F4_WAKEUP)
+						{
+							pthread_cond_signal(&g_time_cond);
+						}
+						
+						pthread_mutex_unlock(&g_time_mutex);
 					}
-					else if (s_u8State == FSM_FINGER_UNBLOCK)
-					{
-						bIsSendTimeDisplayBy1Sec = false;
-
-						// Save history
-						ProcessWriteHistoryLog(s_u8State, "Unlocked");
-
-						// cũng có thể gọi signal ở đây nếu muốn thread lập tức dừng gửi 1s 
-						// và chuyển ngay sang chế độ chờ 60s mà không phải đợi nốt chu kỳ 1s hiện tại.
-						pthread_cond_signal(&g_time_cond);
-					}
-					else if (s_u8State == FSM_SYSTEM_STM32F4_WAKEUP)
-					{
-						pthread_cond_signal(&g_time_cond);
-					}
-					
-					pthread_mutex_unlock(&g_time_mutex);
 				}
 				else
 				{

@@ -40,6 +40,47 @@ void Database_End(void)
 	printf("Closed SQLite3 database");
 }
 
+int get_lowest_available_id(void)
+{
+    sqlite3_stmt *stmt;
+    const char *sql_query =
+        "SELECT MIN(t1.ID + 1) AS NextID "
+        "FROM memberlst t1 "
+        "LEFT JOIN memberlst t2 ON t1.ID + 1 = t2.ID "
+        "WHERE t2.ID IS NULL;";
+    int rc;
+    int next_id = 1;
+
+    pthread_mutex_lock(&g_db_mutex);
+
+    rc = sqlite3_prepare_v2(db, sql_query, -1, &stmt, NULL);
+    if (rc != SQLITE_OK)
+    {
+        fprintf(stderr, "Lỗi chuẩn bị truy vấn tìm ID trống: %s\n", sqlite3_errmsg(db));
+        pthread_mutex_unlock(&g_db_mutex);
+        return 0;
+    }
+
+    rc = sqlite3_step(stmt);
+    if (rc == SQLITE_ROW)
+    {
+        next_id = sqlite3_column_int(stmt, 0);
+        if (next_id < 1)
+        {
+            next_id = 1;
+        }
+    }
+    else
+    {
+        next_id = 1;
+    }
+
+    sqlite3_finalize(stmt);
+    pthread_mutex_unlock(&g_db_mutex);
+
+    return next_id;
+}
+
 int get_user_name(int id, char* output_name) 
 {
     sqlite3_stmt *stmt;

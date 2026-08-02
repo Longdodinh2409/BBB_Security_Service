@@ -40,6 +40,9 @@ typedef enum {
 	FSM_FINGER_UNBLOCK,			// Đã hết giờ Block
 
 	FSM_SYSTEM_STM32F4_WAKEUP,	// STM32F4 wake up (initialize done!)
+
+	FSM_ENROLL_REQUEST_ID,      // STM32F4 yêu cầu BBB cấp ID mới cho enrollment
+	FSM_ENROLL_ID_ERROR,        // BBB không cấp được ID mới cho enrollment
 	FSM_NEW_FINGERPRINT_ADDED,
 	FSM_REMOVE_SPECIFIC_FINGERPRINT
 } Fingerprint_State_t;
@@ -63,6 +66,7 @@ void* handle_CLI_thread(void *arg);
 void ProcessWriteHistoryLog(uint8_t u8State, const char* pcname);
 
 int get_user_name(int id, char* output_name);
+int get_lowest_available_id(void);
 int add_new_member(int id, const char* name);
 int delete_member(int id) ;
 
